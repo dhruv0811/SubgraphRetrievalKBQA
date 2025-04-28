@@ -3,6 +3,7 @@ import inspect
 import math
 import sys
 import os
+print(os.getcwd())
 import re
 import json
 import shutil
@@ -77,8 +78,8 @@ from transformers.trainer import unwrap_model
 from transformers.optimization import Adafactor, AdamW, get_scheduler
 import copy
 # Set path to SentEval
-PATH_TO_SENTEVAL = f'{os.getcwd()}/../SentEval'
-PATH_TO_DATA = f'{os.getcwd()}/../SentEval/data'
+PATH_TO_SENTEVAL = f'/home/dhruvgu2/SentEval'
+PATH_TO_DATA = f'/home/dhruvgu2/SentEval/data'
 
 # Import SentEval
 sys.path.insert(0, PATH_TO_SENTEVAL)
@@ -304,7 +305,7 @@ class CLTrainer(Trainer):
             num_train_epochs = 1
             num_update_steps_per_epoch = max_steps
 
-        if self.args.deepspeed:
+        if self.args.deepspeed and False:
             model, optimizer, lr_scheduler = init_deepspeed(self, num_training_steps=max_steps)
             self.model = model.module
             self.model_wrapped = model  # will get further wrapped in DDP

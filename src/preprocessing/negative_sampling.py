@@ -10,6 +10,7 @@ from tqdm import tqdm
 from func_timeout import func_set_timeout, FunctionTimedOut
 
 from knowledge_graph.knowledge_graph import KnowledgeGraph
+from knowledge_graph.knowledge_graph_ontology import KnowledgeBaseOntology
 from knowledge_graph.knowledge_graph_freebase import KnowledgeGraphFreebase
 from knowledge_graph.knowledge_graph_cache import KnowledgeGraphCache
 from utils import load_jsonl
@@ -18,7 +19,7 @@ from config import cfg
 END_REL = "END OF HOP"
 
 @func_set_timeout(10)
-def generate_data_list(path_json_obj, json_obj, pos_rels, kg: KnowledgeGraphFreebase):
+def generate_data_list(path_json_obj, json_obj, pos_rels, kg: KnowledgeBaseOntology):
     new_data_list = []
     neg_num = 15
 
@@ -94,7 +95,7 @@ def run_negative_sampling():
     if not os.path.exists(folder_path):
         os.makedirs(folder_path)
 
-    kg = KnowledgeGraphFreebase()
+    kg = KnowledgeBaseOntology()
     threshold = 0.5
     
     data_list = load_jsonl(load_data_path)
@@ -102,7 +103,7 @@ def run_negative_sampling():
 
     new_data_list = []
     timeout_count = 0
-    for json_obj in tqdm(data_list, desc="negative-sampling"):
+    for json_obj in tqdm(data_list, desc="Negative Sampling"):
         path_and_score_list = json_obj["path_and_score_list"]
         path_and_score_list = [path_json_obj for path_json_obj in path_and_score_list if path_json_obj["score"] >= threshold]
         pos_rels = {}  # 1-hop positive, 2-hop positive, ...

@@ -14,22 +14,25 @@ from transformers import AutoModel, AutoTokenizer
 from loguru import logger
 
 from knowledge_graph.knowledge_graph import KnowledgeGraph
+from knowledge_graph.knowledge_graph_ontology import KnowledgeBaseOntology
 from knowledge_graph.knowledge_graph_cache import KnowledgeGraphCache
 from knowledge_graph.knowledge_graph_freebase import KnowledgeGraphFreebase
 from config import cfg
 
 END_REL = "END OF HOP"
 
-TOP_K = 10
+# TOP_K = 10
+TOP_K = 20
 
-_min_score = 1e5
+# _min_score = 1e5
+_min_score = 0
 
 retrieval_model_ckpt = cfg.retriever_model_ckpt
 device = 'cuda'
 
 print("[load model begin]")
 
-kg = KnowledgeGraphCache()
+kg = KnowledgeBaseOntology(max_hop=3)
 tokenizer = AutoTokenizer.from_pretrained(retrieval_model_ckpt)
 model = AutoModel.from_pretrained(retrieval_model_ckpt)
 model = model.to(device)
@@ -194,22 +197,24 @@ def build_graph(nodes: List[str], triples: List[str]):
     return G
 
 
-def retrieve_subgraph(json_obj: Dict[str, Any], entities):
+def retrieve_subgraph(json_obj: Dict[str, Any], entities=None):
     # logger.info("[sample]")
 
     question = json_obj["question"]
-    if len(json_obj["entities"]) == 0:
+    if len(json_obj["topic_entities"]) == 0:
         return
     
-    answers = set([ans_obj["kb_id"] for ans_obj in json_obj["answers"]])
+    # answers = set([ans_obj["kb_id"] for ans_obj in json_obj["answers"]])
+    answers = set([ans_obj for ans_obj in json_obj["answers"]])
     
     paths = []  # List[Tuple[str, List[relation]]]
     graphs = []
     
     # print("len entities:", len(json_obj["entities"]))
     # logger.info(f'question: {question}')
-    for entity_id in json_obj["entities"]:
-        topic_entity = entities[entity_id]
+    for entity_id in json_obj["topic_entities"]:
+        # topic_entity = entities[entity_id]
+        topic_entity = entity_id
 
         path_score_list = infer_paths_from_kb(question, topic_entity, TOP_K, TOP_K, 2)
         nodes = []
@@ -254,7 +259,8 @@ def retrieve_subgraph(json_obj: Dict[str, Any], entities):
     subgraph_entities = [e for e in nodes]
     subgraph_tuples = [(h, r, t) for h, r, t in triples]
     json_obj["paths"] = paths
-    json_obj["entities"] = [entities[e] for e in json_obj["entities"]]
+    # json_obj["entities"] = [entities[e] for e in json_obj["entities"]]
+    json_obj["entities"] = [e for e in json_obj["topic_entities"]]
     json_obj["subgraph"] = {
         "tuples": subgraph_tuples,
         "entities": subgraph_entities
@@ -279,23 +285,23 @@ def run():
     
     subprocess.run(["cp", "-r", load_data_folder, os.path.dirname(dump_data_folder)])
     
-    train_dataset = load_jsonl(os.path.join(load_data_folder, "train_simple.json"))
-    test_dataset = load_jsonl(os.path.join(load_data_folder, "test_simple.json"))    
-    dev_dataset = load_jsonl(os.path.join(load_data_folder, "dev_simple.json"))    
+    # train_dataset = load_jsonl(os.path.join(load_data_folder, "train_simple.json"))
+    # test_dataset = load_jsonl(os.path.join(load_data_folder, "test_simple.json"))    
+    dev_dataset = load_jsonl(os.path.join(load_data_folder, "step0_dev.json"))    
 
-    entities = build_entities(load_data_folder)
+    # entities = build_entities(load_data_folder)
     
-    for json_obj in tqdm(train_dataset, desc="retrieve:train"):
-        retrieve_subgraph(json_obj, entities)
+    # for json_obj in tqdm(train_dataset, desc="retrieve:train"):
+    #     retrieve_subgraph(json_obj, entities)
     
-    for json_obj in tqdm(test_dataset, desc="retrieve:test"):
-        retrieve_subgraph(json_obj, entities)
+    # for json_obj in tqdm(test_dataset, desc="retrieve:test"):
+    #     retrieve_subgraph(json_obj, entities)
 
     for json_obj in tqdm(dev_dataset, desc="retrieve:dev"):
-        retrieve_subgraph(json_obj, entities)
+        retrieve_subgraph(json_obj) #, entities
 
-    dump_jsonl(train_dataset, os.path.join(dump_data_folder, "train_simple.json"))
-    dump_jsonl(test_dataset, os.path.join(dump_data_folder, "test_simple.json"))
-    dump_jsonl(dev_dataset, os.path.join(dump_data_folder, "dev_simple.json"))
+    # dump_jsonl(train_dataset, os.path.join(dump_data_folder, "train_simple.json"))
+    # dump_jsonl(test_dataset, os.path.join(dump_data_folder, "test_simple.json"))
+    dump_jsonl(dev_dataset, os.path.join(dump_data_folder, "dev_simple_top20_min0.json"))
 
     print("min score:", _min_score)

@@ -9,6 +9,7 @@ from tqdm import tqdm
 
 from knowledge_graph.knowledge_graph import KnowledgeGraph
 from knowledge_graph.knowledge_graph_cache import KnowledgeGraphCache
+from knowledge_graph.knowledge_graph_ontology import KnowledgeBaseOntology
 from knowledge_graph.knowledge_graph_freebase import KnowledgeGraphFreebase
 from utils import load_jsonl, dump_jsonl
 from config import cfg
@@ -17,12 +18,12 @@ def run_score_path():
     load_data_path = cfg.preprocessing["step2"]["load_data_path"]
     dump_data_path = cfg.preprocessing["step2"]["dump_data_path"]
 
-    kg = KnowledgeGraphFreebase()
+    kg = KnowledgeBaseOntology()
 
     data_list = load_jsonl(load_data_path)
 
     data_with_path_list = []
-    for (item, paths) in tqdm(data_list):
+    for (item, paths) in tqdm(data_list, desc="Run Score Path"):
         m = set()
         for path in paths:
             if isinstance(path, str):

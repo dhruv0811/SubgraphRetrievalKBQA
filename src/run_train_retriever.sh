@@ -4,7 +4,7 @@ set -e
 
 load_data_path=${1}
 dump_model_path=${2}
-device=0
+device=0,1,2,3
 
 cd retriever
 
@@ -13,8 +13,8 @@ model_name_or_path="roberta-base"
 
 CUDA_VISIBLE_DEVICES=${device} python train.py \
     --model_name_or_path ${model_name_or_path} \
-    --train_file ../${load_data_path} \
-    --output_dir ../${dump_model_path} \
+    --train_file ${load_data_path} \
+    --output_dir ${dump_model_path} \
     --num_train_epochs 10 \
     --per_device_train_batch_size 16 \
     --learning_rate 5e-5 \
@@ -25,6 +25,6 @@ CUDA_VISIBLE_DEVICES=${device} python train.py \
     --temp 0.05 \
     --do_train
 
-python simcse_to_huggingface.py --path ../${dump_model_path}
+python simcse_to_huggingface.py --path ${dump_model_path}
 
 cd ..

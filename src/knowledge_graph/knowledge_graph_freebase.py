@@ -10,7 +10,7 @@ from copy import deepcopy
 class KnowledgeGraphFreebase:
 
     def __init__(self) -> None:
-        self.sparql = SPARQLWrapper("http://10.77.110.128:3001/sparql")
+        self.sparql = SPARQLWrapper("http://localhost:3001/sparql")
         self.sparql.setReturnFormat(JSON)
 
     def get_relation(self, entity: str, limit: int = 100) -> List[str]:
@@ -240,6 +240,14 @@ class KnowledgeGraphFreebase:
         topic_entity = src
         answer_entity = tgt
 
+        topic_entity_prefix = "" if 'XMLSchema' in src else "ns:"
+        answer_entity_prefix = "" if 'XMLSchema' in tgt else "ns:"
+
+        # Swap number into tgt
+        if topic_entity_prefix != "ns:":
+            topic_entity, answer_entity = answer_entity, topic_entity
+            topic_entity_prefix, answer_entity_prefix = answer_entity_prefix, topic_entity_prefix
+        
         prefix = """
                 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
                 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -247,14 +255,14 @@ class KnowledgeGraphFreebase:
         """
         query = f"""
             select distinct ?r1 where {{
-                ns:{topic_entity} ?r1_ ns:{answer_entity} . 
+                {topic_entity_prefix + topic_entity} ?r1_ {answer_entity_prefix + answer_entity} . 
                 FILTER regex(?r1_, "http://rdf.freebase.com/ns/")
                 bind(strafter(str(?r1_),str(ns:)) as ?r1)
             }}
         """
 
         query = prefix + query
-        # print(query)
+        print(query)
         self.sparql.setQuery(query)
         try:
             results = self.sparql.query().convert()
@@ -267,6 +275,14 @@ class KnowledgeGraphFreebase:
         topic_entity = src
         answer_entity = tgt
 
+        topic_entity_prefix = "" if 'XMLSchema' in src else "ns:"
+        answer_entity_prefix = "" if 'XMLSchema' in tgt else "ns:"
+
+        # Swap number into tgt
+        if topic_entity_prefix != "ns:":
+            topic_entity, answer_entity = answer_entity, topic_entity
+            topic_entity_prefix, answer_entity_prefix = answer_entity_prefix, topic_entity_prefix
+
         prefix = """
                 PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
                 PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
@@ -274,8 +290,8 @@ class KnowledgeGraphFreebase:
         """
         query = f"""
             select distinct ?r1 ?r2 where {{
-                ns:{topic_entity} ?r1_ ?e1 . 
-                ?e1 ?r2_ ns:{answer_entity} .
+                {topic_entity_prefix + topic_entity} ?r1_ ?e1 . 
+                ?e1 ?r2_ {answer_entity_prefix + answer_entity} .
                 FILTER regex(?e1, "http://rdf.freebase.com/ns/")
                 FILTER regex(?r1_, "http://rdf.freebase.com/ns/")
                 FILTER regex(?r2_, "http://rdf.freebase.com/ns/")
@@ -667,3 +683,137 @@ class KnowledgeGraphFreebase:
             return self.deduce_leaves_relation_by_path_one(src, path)
         else:
             return self.deduce_leaves_relation_by_path_two(src, path)
+
+    def get_entity_classes(self, entity_mid: str) -> List[str]:
+        """
+        Get the classes (types) of a Freebase entity.
+        
+        Args:
+            entity_mid (str): The Freebase entity ID (e.g. "m.0b787yg")
+            
+        Returns:
+            List[str]: A list of class/type IDs that the entity belongs to
+        """
+        if not entity_mid.startswith("m.") and not entity_mid.startswith("g."):
+            # Ensure entity has proper format
+            if "m." in entity_mid or "g." in entity_mid:
+                # Extract the ID portion if it's embedded somewhere in the string
+                for prefix in ["m.", "g."]:
+                    if prefix in entity_mid:
+                        start_idx = entity_mid.find(prefix)
+                        entity_mid = entity_mid[start_idx:]
+                        break
+            else:
+                print(f"Warning: Entity ID format looks non-standard: {entity_mid}")
+        
+        # Format query
+        prefix = """
+                PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                PREFIX ns: <http://rdf.freebase.com/ns/>
+        """
+        query = f"""
+            SELECT DISTINCT ?type ?type_name WHERE {{
+                ns:{entity_mid} ns:type.object.type ?type_ .
+                OPTIONAL {{ ?type_ ns:type.object.name ?type_name . 
+                        FILTER(LANG(?type_name) = "en") }}
+                FILTER regex(?type_, "http://rdf.freebase.com/ns/")
+                bind(strafter(str(?type_),str(ns:)) as ?type)
+            }}
+        """
+        
+        query = prefix + query
+        self.sparql.setQuery(query)
+        
+        try:
+            results = self.sparql.query().convert()
+        except urllib.error.URLError:
+            print(f"Error querying for entity types for {entity_mid}")
+            return []
+        
+        # Extract types from results
+        types = []
+        if 'results' in results and 'bindings' in results['results']:
+            for result in results['results']['bindings']:
+                types.append(result['type']['value'])
+                
+        return self.get_notable_classes(types)
+
+    def get_notable_classes(self, classes: List[str]) -> List[str]:
+        """
+        Filter a list of classes to return only the most notable/informative ones.
+        Removes very general classes like common.topic, etc.
+        
+        Args:
+            classes (List[str]): List of class IDs
+            
+        Returns:
+            List[str]: Filtered list of notable class IDs
+        """
+        # Classes to filter out (too general or not informative)
+        non_notable_classes = {
+            "common.topic", 
+            "common.notable_for", 
+            "freebase.object_profile",
+            "freebase.topic_server_aspect_generic",
+            "freebase.topical_thing",
+            "common.document"
+        }
+        
+        # Return filtered list
+        return [cls for cls in classes if not any(cls.startswith(prefix) for prefix in non_notable_classes)]
+    
+    def get_entity_classes(self, entity_mid: str) -> List[str]:
+        """
+        Get the classes (types) of a Freebase entity.
+        
+        Args:
+            entity_mid (str): The Freebase entity ID (e.g. "m.0b787yg")
+            
+        Returns:
+            List[str]: A list of class/type IDs that the entity belongs to
+        """
+        if not entity_mid.startswith("m.") and not entity_mid.startswith("g."):
+            # Ensure entity has proper format
+            if "m." in entity_mid or "g." in entity_mid:
+                # Extract the ID portion if it's embedded somewhere in the string
+                for prefix in ["m.", "g."]:
+                    if prefix in entity_mid:
+                        start_idx = entity_mid.find(prefix)
+                        entity_mid = entity_mid[start_idx:]
+                        break
+            else:
+                print(f"Warning: Entity ID format looks non-standard: {entity_mid}")
+        
+        # Format query
+        prefix = """
+                PREFIX rdf: <http://www.w3.org/1999/02/22-rdf-syntax-ns#>
+                PREFIX rdfs: <http://www.w3.org/2000/01/rdf-schema#>
+                PREFIX ns: <http://rdf.freebase.com/ns/>
+        """
+        query = f"""
+            SELECT DISTINCT ?type ?type_name WHERE {{
+                ns:{entity_mid} ns:type.object.type ?type_ .
+                OPTIONAL {{ ?type_ ns:type.object.name ?type_name . 
+                        FILTER(LANG(?type_name) = "en") }}
+                FILTER regex(?type_, "http://rdf.freebase.com/ns/")
+                bind(strafter(str(?type_),str(ns:)) as ?type)
+            }}
+        """
+        
+        query = prefix + query
+        self.sparql.setQuery(query)
+        
+        try:
+            results = self.sparql.query().convert()
+        except urllib.error.URLError:
+            print(f"Error querying for entity types for {entity_mid}")
+            return []
+        
+        # Extract types from results
+        types = []
+        if 'results' in results and 'bindings' in results['results']:
+            for result in results['results']['bindings']:
+                types.append(result['type']['value'])
+                
+        return self.get_notable_classes(types)
