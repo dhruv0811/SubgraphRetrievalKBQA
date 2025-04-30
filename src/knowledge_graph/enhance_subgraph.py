@@ -39,8 +39,8 @@ def enhance_subgraph(entry, ontology):
 
 def main():    
     # Path to input and output JSONL files
-    INPUT_JSONL = "/home/dhruvgu2/SubgraphRetrievalKBQA/results/reader_data/grailqa/dev_simple_top20_min0.jsonl"
-    OUTPUT_JSONL = "/home/dhruvgu2/SubgraphRetrievalKBQA/results/reader_data/grailqa/dev_simple_top20_min0_dense_enhanced_PARTIAL_TYPE.jsonl"
+    INPUT_JSONL = "/home/dhruvgu2/SubgraphRetrievalKBQA/results/reader_data/grailqa/dev_simple_relation_filtering.jsonl"
+    OUTPUT_JSONL = "/home/dhruvgu2/SubgraphRetrievalKBQA/results/reader_data/grailqa/dev_simple_relation_filtering_TYPE.jsonl"
     
     # Initialize the ontology
     ontology = KnowledgeBaseOntology()

@@ -11,7 +11,7 @@ def run():
 
     # train_dataset = load_jsonl(os.path.join(load_data_path, "train_simple.json"))
     # test_dataset = load_jsonl(os.path.join(load_data_path, "test_simple.json"))
-    dev_dataset = load_jsonl(os.path.join(load_data_path, "dev_simple_top20_min0.json"))
+    dev_dataset = load_jsonl(os.path.join(load_data_path, "dev_simple_relation_filtering.jsonl"))
 
     entity_set = set()
     relation_set = set()

@@ -22,7 +22,7 @@ def calculate_overlap_and_size():
     # Load the files
     original_data = load_original_file("/home/dhruvgu2/SubgraphRetrievalKBQA/data/GrailQA/data/grailqa_v1.0_dev.json")
     # retrieved_data = load_retrieved_file("/home/dhruvgu2/SubgraphRetrievalKBQA/results/reader_data/grailqa/dev_simple.jsonl")
-    retrieved_data = load_retrieved_file("/home/dhruvgu2/SubgraphRetrievalKBQA/results/reader_data/grailqa/dev_simple_top20_min0_dense_enhanced_PARTIAL_TYPE.jsonl")
+    retrieved_data = load_retrieved_file("/home/dhruvgu2/SubgraphRetrievalKBQA/results/reader_data/grailqa/dev_simple_relation_filtering_TYPE.jsonl")
     
     # Create a dictionary to map questions to retrieved data for faster lookup
     retrieved_dict = {item['question']: item for item in retrieved_data}
@@ -346,7 +346,7 @@ def main():
         'summary': summary
     }
     
-    with open('/home/dhruvgu2/SubgraphRetrievalKBQA/src/eval/enhanced_partial_type_top20_min0_subgraph_analysis.json', 'w') as f:
+    with open('/home/dhruvgu2/SubgraphRetrievalKBQA/src/eval/relation_filtering_on_type_only.json', 'w') as f:
         json.dump(output, f, indent=2)
     
     print(f"\nDetailed results saved to comprehensive_analysis_grailqa_dev.json")

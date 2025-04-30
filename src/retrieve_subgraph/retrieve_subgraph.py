@@ -39,19 +39,55 @@ model = model.to(device)
 
 print("[load model end]")
 
+def extract_domains(relations: List[str]) -> List[str]:
+    """Extract unique domains from a list of relations"""
+    domains = set()
+    for relation in relations:
+        if "." in relation:
+            domain = relation.split(".")[0]
+            domains.add(domain)
+    return list(domains)
+
+@torch.no_grad()
+def score_domains(question: str, domains: List[str], theta: float = 0.07, top_k: int = 3) -> List[str]:
+    """Score domains based on similarity to question and return top k domains"""
+    if not domains:
+        return []
+    
+    q_emb = get_texts_embeddings([question]).unsqueeze(1)  # [1, 1, D]
+    domain_emb = get_texts_embeddings(domains).unsqueeze(0)  # [1, L, D]
+    sim_score = torch.cosine_similarity(q_emb, domain_emb, dim=2) / theta  # [1, L]
+    
+    # Get top k domains
+    values, indices = torch.topk(sim_score[0], min(top_k, len(domains)))
+    top_domains = [domains[i] for i in indices.tolist()]
+    
+    return top_domains
+
 def path_to_subgraph(topic_entity: str, path: List[str]):
     """输入topic_entity, path, 得到对应的实例化子图——节点集合、三元组集合"""
     return kg.deduce_subgraph_by_path(topic_entity, path)
 
-def path_to_candidate_relations(topic_entity: str, path: List[str]) -> List[str]:
-    """输入topic_entity, 得到叶子结点能提供的候选relation的集合"""
+def path_to_candidate_relations(topic_entity: str, path: List[str], question: str, top_k_domains: int = 3) -> List[str]:
+    """Input topic_entity, get leaf node candidate relations filtered by top domains"""
+    # Get all candidate relations
     new_relations = kg.deduce_leaves_relation_by_path(topic_entity, path)
-    # filter relation
-    candidate_relations = [r for r in new_relations if r.split(".")[0] not in ["kg", "common"]]
     
-    # limit = 10
-    # candidate_relations = [r for r in candidate_relations if 
-    #                        kg.deduce_leaves_count_by_path(topic_entity, path + [r]) <= limit ** (len(path) + 1)]
+    # Extract domains
+    domains = extract_domains(new_relations)
+    
+    # Score domains and get top k
+    top_domains = score_domains(question, domains, top_k=top_k_domains)
+    
+    # Filter relations by top domains and explicitly excluded domains
+    excluded_domains = ["kg", "common"]
+    if top_domains:
+        candidate_relations = [r for r in new_relations 
+                              if r.split(".")[0] in top_domains and 
+                              r.split(".")[0] not in excluded_domains]
+    else:
+        # Fallback to original filtering if no domains are found
+        candidate_relations = [r for r in new_relations if r.split(".")[0] not in excluded_domains]
     
     return list(candidate_relations)
 
@@ -107,7 +143,7 @@ def infer_paths_from_kb(question: str, topic_entity: str, num_beams: int, num_re
             path_score_list.append(path_score)
             # logger.info(f'path_to_candidate_relations: {topic_entity}, {path}')
             candidate_relations = path_to_candidate_relations(
-                topic_entity, path)
+                topic_entity, path, question)
             candidate_relations = candidate_relations + [END_REL]
             relation_list_list.append(candidate_relations)
         # logger.info(f'path_list and relation_list_list:{path_list} {relation_list_list}')
@@ -302,6 +338,6 @@ def run():
 
     # dump_jsonl(train_dataset, os.path.join(dump_data_folder, "train_simple.json"))
     # dump_jsonl(test_dataset, os.path.join(dump_data_folder, "test_simple.json"))
-    dump_jsonl(dev_dataset, os.path.join(dump_data_folder, "dev_simple_top20_min0.json"))
+    dump_jsonl(dev_dataset, os.path.join(dump_data_folder, "dev_simple_relation_filtering.json"))
 
     print("min score:", _min_score)
